@@ -9,14 +9,18 @@
     :root {
       --bg-light: #fafafa;
       --bg-dark: #111214;
-      --fg-dark: #1a1a1a;
+      --fg-dark: #101010;
       --fg-muted: #767676;
       --accent: #5a3eff;
       --border: #e4e4e4;
       --shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
     }
     html, body { margin: 0; height: 100%; overflow: hidden; }
-    body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: var(--bg-light); color: var(--fg-dark); }
+    body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; background: var(--bg-light); color: var(--fg-dark); cursor: none; }
+    a, button, .folder { cursor: none; }
+    @media (pointer: coarse) {
+      body, a, button, .folder { cursor: auto; }
+    }
 
     .scroll-container {
       height: 100vh;
@@ -50,6 +54,15 @@
 
     @keyframes fadeUp { 0% { opacity: 0; transform: translateY(40px); } 100% { opacity: 1; transform: translateY(0); } }
     .fade-up { opacity: 0; animation: fadeUp 1s ease-out forwards; animation-delay: 0.3s; }
+
+    .cursor-dot { position: fixed; top: 0; left: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--fg-dark); pointer-events: none; z-index: 9999; mix-blend-mode: difference; transform: translate(-50%, -50%); transition: width 0.25s ease, height 0.25s ease, background 0.25s ease; will-change: transform; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; color: transparent; }
+    .cursor-dot.hover { width: 64px; height: 64px; background: #fff; color: var(--fg-dark); }
+    @media (pointer: coarse) { .cursor-dot { display: none; } }
+
+    @keyframes floaty { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+
+    [data-stagger] .word { display: inline-block; opacity: 0; transform: translateY(0.6em); }
+    .section.in-view [data-stagger] .word { animation: fadeUp 0.6s ease forwards; }
 
     @font-face {
       font-family: 'Heading Pro Trial';
@@ -87,9 +100,9 @@
     .minimize { background: #ffbd2e; }
     .maximize { background: #27c93f; }
     .mac-body { position: relative; width: 100%; height: 100%; padding: 3rem 4rem; box-sizing: border-box; }
-    .folder { position: absolute; text-align: center; cursor: grab; user-select: none; }
-    .folder img { width: 130px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.12)); transition: transform 0.25s ease, filter 0.25s ease; }
-    .folder:hover img { transform: translateY(-4px); filter: drop-shadow(0px 10px 14px rgba(0,0,0,0.16)); }
+    .folder { position: absolute; text-align: center; cursor: grab; user-select: none; transition: transform 0.2s ease-out; }
+    .folder img { width: 130px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.12)); transition: transform 0.25s ease, filter 0.25s ease; animation: floaty 3.4s ease-in-out infinite; }
+    .folder:hover img { animation-play-state: paused; transform: translateY(-6px); filter: drop-shadow(0px 12px 16px rgba(0,0,0,0.18)); }
     .folder .label { color: var(--fg-muted); font-size: 0.85rem; letter-spacing: 0.02em; margin-top: 0.6rem; }
     .tab-bar { display: flex; gap: 6px; margin-left: 20px; }
     .tab { background: #e2e2e2; padding: 5px 10px; border-radius: 4px 4px 0 0; cursor: pointer; color: var(--fg-muted); font-size: 0.85rem; display: flex; align-items: center; gap: 4px; }
@@ -120,11 +133,12 @@
 </style>
 </head>
 <body>
+<div class="cursor-dot" id="cursorDot"></div>
 <div class="scroll-container" id="scrollContainer">
-  <div class="section" id="home" style="display: flex; align-items: center; justify-content: flex-start; padding-left: 8vw; background: radial-gradient(circle at center, #ffffff, var(--bg-light) 55%, #ececec 100%); text-align: left; overflow: hidden;">
+  <div class="section" id="home" style="display: flex; align-items: center; justify-content: flex-start; padding-left: 8vw; background: radial-gradient(circle at center, #007bff, #00c6ff, #d9faff); text-align: left; overflow: hidden;">
     <div class="fade-up" style="position: absolute; top: 20%; left: 8vw; transform: translateY(-50%);">
-      <h1 style="font-size: clamp(1.6rem, 5vw, 2.8rem); font-weight: 600; letter-spacing: -0.01em; margin-bottom: clamp(3rem, 18vw, 13rem); margin-top: 0px; color: var(--fg-dark);">2025<br><span style="font-size: clamp(3rem, 16vw, 10rem); font-family: 'Heading Pro Trial'; letter-spacing: -0.02em; color: var(--fg-dark);">PORTFOLIO</span></h1>
-      <p style="font-size: clamp(1rem, 3vw, 1.8rem); max-width: 600px; line-height: 1.7; font-weight: 600; letter-spacing: 0.02em; color: var(--fg-muted);">JEONG CHAN HEE</p>
+      <h1 style="font-size: clamp(1.6rem, 5vw, 2.8rem); font-weight: 600; letter-spacing: -0.01em; margin-bottom: clamp(3rem, 18vw, 13rem); margin-top: 0px; color: #202123;">2025<br><span style="font-size: clamp(3rem, 16vw, 10rem); font-family: 'Heading Pro Trial'; letter-spacing: -0.02em; color: #030303;">PORTFOLIO</span></h1>
+      <p style="font-size: clamp(1rem, 3vw, 1.8rem); max-width: 600px; line-height: 1.7; font-weight: 600; letter-spacing: 0.02em; color: #333;">JEONG CHAN HEE</p>
     </div>
   </div>
   <div class="section" id="about">
@@ -150,7 +164,7 @@
     </div>
   </div>
   <div class="section" id="contact" style="display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg-dark); color: #222; text-align: left;">
-    <p style="color: #fff; font-size: clamp(1.2rem, 4vw, 2.3rem); font-weight: 300; margin-bottom: 20px; padding: 0 1rem; text-align: center;">함께 일할 그래픽 디자이너를 찾고 계신가요?</p>
+    <p id="contactLead" data-stagger style="color: #fff; font-size: clamp(1.2rem, 4vw, 2.3rem); font-weight: 300; margin-bottom: 20px; padding: 0 1rem; text-align: center;">함께 일할 그래픽 디자이너를 찾고 계신가요?</p>
     <h1 style="color: #fff; font-size: clamp(1.6rem, 8vw, 5rem); font-weight: 700; letter-spacing: -0.01em; margin-top: 0rem; margin-bottom: 1.2rem; padding: 0 1rem; text-align: center; word-break: break-word;">chanhee.jeong0@gmail.com</h1>
     <a href="mailto:chanhee.jeong0@gmail.com" class="mail-link" style="text-decoration: none; color: var(--accent); font-weight: 600; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid transparent;">메일 보내기 ➔</a>
   </div>
@@ -185,7 +199,11 @@ document.addEventListener('DOMContentLoaded',()=>{
     activateTab(link);
   }
 
+  const isTouch=window.matchMedia('(pointer: coarse)').matches;
+
   folders.forEach(folder=>{
+    folder.querySelector('img').style.animationDelay=`${(Math.random()*2).toFixed(2)}s`;
+
     if(!isMobile){
       let x,y,tries=0;
       do{
@@ -195,12 +213,25 @@ document.addEventListener('DOMContentLoaded',()=>{
       }while(isOverlapping(x,y)&&tries<100);
       folder.style.left=`${x}px`;folder.style.top=`${y}px`;placed.push({x,y});
 
+      let dragging=false;
       folder.addEventListener('pointerdown',e=>{
-        e.preventDefault();const offsetX=e.clientX-folder.offsetLeft,offsetY=e.clientY-folder.offsetTop;
+        e.preventDefault();dragging=true;folder.style.transform='';
+        const offsetX=e.clientX-folder.offsetLeft,offsetY=e.clientY-folder.offsetTop;
         const onMove=ev=>{folder.style.left=`${ev.clientX-offsetX}px`;folder.style.top=`${ev.clientY-offsetY}px`;};
-        const onUp=()=>{document.removeEventListener('pointermove',onMove);document.removeEventListener('pointerup',onUp);};
+        const onUp=()=>{dragging=false;document.removeEventListener('pointermove',onMove);document.removeEventListener('pointerup',onUp);};
         document.addEventListener('pointermove',onMove);document.addEventListener('pointerup',onUp);
       });
+
+      if(!isTouch){
+        folder.addEventListener('mousemove',e=>{
+          if(dragging)return;
+          const rect=folder.getBoundingClientRect();
+          const nx=(e.clientX-(rect.left+rect.width/2))*0.25;
+          const ny=(e.clientY-(rect.top+rect.height/2))*0.25;
+          folder.style.transform=`translate(${nx}px, ${ny}px)`;
+        });
+        folder.addEventListener('mouseleave',()=>{if(!dragging)folder.style.transform='';});
+      }
 
       folder.addEventListener('dblclick',()=>openLink(folder));
     } else {
@@ -240,6 +271,33 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
   },{threshold:0.5});
   sections.forEach(sec=>sectionObserver.observe(sec));
+
+  function splitIntoSpans(el,className,unit){
+    const text=el.textContent;
+    el.textContent='';
+    const parts=unit==='word'?text.split(/(\s+)/):text.split('');
+    parts.forEach((part,i)=>{
+      if(unit==='word'&&/^\s+$/.test(part)){el.appendChild(document.createTextNode(part));return;}
+      const span=document.createElement('span');
+      span.className=className;
+      span.textContent=part;
+      span.style.animationDelay=`${0.3+i*(unit==='word'?0.08:0.04)}s`;
+      el.appendChild(span);
+    });
+  }
+  splitIntoSpans(document.getElementById('contactLead'),'word','word');
+
+  if(!isTouch){
+    const cursor=document.getElementById('cursorDot');
+    document.addEventListener('mousemove',e=>{
+      cursor.style.left=`${e.clientX}px`;
+      cursor.style.top=`${e.clientY}px`;
+    });
+    document.querySelectorAll('.folder, a, .dots button').forEach(el=>{
+      el.addEventListener('mouseenter',()=>{cursor.classList.add('hover');cursor.textContent=el.classList.contains('folder')?'OPEN':'';});
+      el.addEventListener('mouseleave',()=>{cursor.classList.remove('hover');cursor.textContent='';});
+    });
+  }
 });
 </script>
 </body>
