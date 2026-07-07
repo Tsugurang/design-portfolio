@@ -25,10 +25,12 @@
     .scroll-container {
       height: 100vh;
       overflow-y: scroll;
-      scroll-snap-type: y mandatory;
-      scroll-behavior: smooth;
       -ms-overflow-style: none;
       scrollbar-width: none;
+    }
+    .scroll-container.native-snap {
+      scroll-snap-type: y mandatory;
+      scroll-behavior: smooth;
     }
     .scroll-container::-webkit-scrollbar { display: none; }
 
@@ -54,7 +56,7 @@
     @keyframes fadeUp { 0% { opacity: 0; transform: translateY(40px); } 100% { opacity: 1; transform: translateY(0); } }
     .fade-up { opacity: 0; animation: fadeUp 1s ease-out forwards; animation-delay: 0.3s; }
 
-    .cursor-dot { position: fixed; top: 0; left: 0; width: 14px; height: 14px; border-radius: 50%; background: #fff; pointer-events: none; z-index: 9999; mix-blend-mode: difference; transform: translate(-50%, -50%); transition: width 0.25s ease, height 0.25s ease, background 0.25s ease; will-change: transform; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; color: transparent; }
+    .cursor-dot { position: fixed; top: 0; left: 0; width: 14px; height: 14px; border-radius: 50%; background: #fff; pointer-events: none; z-index: 9999; mix-blend-mode: difference; transform: translate(-50%, -50%); transition: width 0.25s ease, height 0.25s ease, background 0.25s ease, opacity 0.15s ease; will-change: transform; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; color: transparent; }
     .cursor-dot.hover { width: 64px; height: 64px; background: #000; color: #fff; mix-blend-mode: normal; }
     @media (pointer: coarse) { .cursor-dot { display: none; } }
 
@@ -86,6 +88,11 @@
       align-items: center;
       background: var(--bg-light);
       z-index: 1;
+    }
+    .section#projects {
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
     .about-content {
       width: 100%;
@@ -163,7 +170,7 @@
 <body>
 <div class="cursor-dot" id="cursorDot"></div>
 <div class="scroll-container" id="scrollContainer">
-  <div class="section" id="home" style="display: flex; align-items: center; justify-content: flex-start; padding-left: 8vw; background: linear-gradient(180deg, #007bff 0%, #00c6ff 42%, #d9faff 72%, var(--bg-light) 100%); text-align: left; overflow: hidden;">
+  <div class="section" id="home" style="display: flex; align-items: center; justify-content: flex-start; padding-left: 8vw; background: linear-gradient(to bottom, transparent 65%, var(--bg-light) 100%), radial-gradient(circle at center, #007bff, #00c6ff, #d9faff); text-align: left; overflow: hidden;">
     <div class="fade-up" style="position: absolute; top: 20%; left: 8vw; transform: translateY(-50%);">
       <h1 style="font-size: clamp(1.6rem, 5vw, 2.8rem); font-weight: 600; letter-spacing: -0.01em; margin-bottom: clamp(3rem, 18vw, 13rem); margin-top: 0px; color: #202123;">2026<br><span style="font-size: clamp(3rem, 16vw, 10rem); font-family: 'Heading Pro Trial'; letter-spacing: -0.02em; color: #030303;">PORTFOLIO</span></h1>
       <p style="font-size: clamp(1rem, 3vw, 1.8rem); max-width: 600px; line-height: 1.7; font-weight: 600; letter-spacing: 0.02em; color: #333;">JEONG CHAN HEE</p>
@@ -280,6 +287,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 
   const isTouch=window.matchMedia('(pointer: coarse)').matches;
+  if(isTouch)scrollContainer.classList.add('native-snap');
 
   folders.forEach(folder=>{
     folder.querySelector('img').style.animationDelay=`${(Math.random()*2).toFixed(2)}s`;
@@ -416,6 +424,8 @@ document.addEventListener('DOMContentLoaded',()=>{
       el.addEventListener('mouseenter',()=>{cursor.classList.add('hover');cursor.textContent=el.classList.contains('folder')?'OPEN':'';});
       el.addEventListener('mouseleave',()=>{cursor.classList.remove('hover');cursor.textContent='';});
     });
+    contentFrame.addEventListener('mouseenter',()=>{cursor.style.opacity='0';});
+    contentFrame.addEventListener('mouseleave',()=>{cursor.style.opacity='1';});
   }
 });
 </script>
