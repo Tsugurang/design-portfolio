@@ -147,8 +147,17 @@
     .tab.active { background: var(--bg-light); font-weight: bold; color: var(--fg-dark); }
     .tab .close-btn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 4px; font-weight: bold; cursor: pointer; }
     .tab .close-btn:hover { background: rgba(0, 0, 0, 0.08); }
-    iframe.content-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; display: none; z-index: 10; background: var(--bg-light); transform-origin: var(--origin-x, 50%) var(--origin-y, 50%); animation: folderOpen 0.34s cubic-bezier(.2,.8,.2,1); }
-    @keyframes folderOpen { from { opacity: 0; transform: scale(0.55); } to { opacity: 1; transform: scale(1); } }
+    iframe.content-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; display: none; z-index: 10; background: var(--bg-light); transform-origin: var(--origin-x, 50%) var(--origin-y, 50%); animation: folderOpen 0.6s cubic-bezier(.34,1.56,.64,1); }
+    @keyframes folderOpen {
+      0% { opacity: 0; transform: scale(0.25) rotate(-35deg); }
+      45% { opacity: 1; }
+      70% { transform: scale(1.05) rotate(8deg); }
+      100% { opacity: 1; transform: scale(1) rotate(0deg); }
+    }
+
+    .frame-loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; z-index: 11; background: var(--bg-light); }
+    .frame-loader::after { content: ''; width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--fg-dark); animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     .mail-link { transition: border-color 0.25s ease; }
     .mail-link:hover { border-bottom-color: var(--accent); }
@@ -394,6 +403,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     Object.values(iframes).forEach(f=>{f.style.display='none';});
     if(link==='home')return;
     if(!iframes[link]){
+      const loader=document.createElement('div');
+      loader.className='frame-loader';
+      macBody.appendChild(loader);
+
       const f=document.createElement('iframe');
       f.className='content-frame';
       f.src=link;
@@ -407,6 +420,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         f.addEventListener('mouseenter',()=>{cursorDot.style.opacity='0';});
         f.addEventListener('mouseleave',()=>{cursorDot.style.opacity='1';});
       }
+      f.addEventListener('load',()=>loader.remove());
       macBody.appendChild(f);
       iframes[link]=f;
     }
