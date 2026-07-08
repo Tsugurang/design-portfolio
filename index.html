@@ -151,7 +151,14 @@
     .tab.active { background: var(--bg-light); font-weight: bold; color: var(--fg-dark); }
     .tab .close-btn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 4px; font-weight: bold; }
     .tab .close-btn:hover { background: rgba(0, 0, 0, 0.08); }
-    .frame-wrap { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 10; transform-origin: var(--origin-x, 50%) var(--origin-y, 50%); animation: folderOpen 0.5s cubic-bezier(.34,1.56,.64,1); will-change: transform, opacity; }
+    /* The pop-in animation is gated behind .pop instead of running
+       unconditionally, so it only plays once the iframe actually finishes
+       loading (see the `load` handler in activateTab) - previously it ran
+       immediately on click, so on anything not already cached the "reveal"
+       animation was just playing on the empty loading panel, which looked
+       identical to real content since both share the mac UI's background. */
+    .frame-wrap { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 10; transform-origin: var(--origin-x, 50%) var(--origin-y, 50%); will-change: transform, opacity; }
+    .frame-wrap.pop { animation: folderOpen 0.5s cubic-bezier(.34,1.56,.64,1); }
     iframe.content-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; background: var(--bg-light); }
     @keyframes folderOpen {
       0% { opacity: 0; transform: scale(0.08); }
@@ -159,7 +166,7 @@
       100% { opacity: 1; transform: scale(1); }
     }
 
-    .frame-loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; z-index: 11; background: var(--bg-light); }
+    .frame-loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; z-index: 11; background: #efefef; }
     .frame-loader::after { content: ''; width: 34px; height: 34px; border-radius: 50%; border: 3px solid var(--border); border-top-color: var(--fg-dark); animation: spin 0.7s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -443,7 +450,7 @@ document.addEventListener('DOMContentLoaded',()=>{
         f.addEventListener('mouseenter',()=>{cursorDot.style.opacity='0';});
         f.addEventListener('mouseleave',()=>{cursorDot.style.opacity='1';});
       }
-      f.addEventListener('load',()=>loader.remove());
+      f.addEventListener('load',()=>{loader.remove();wrap.classList.add('pop');});
       wrap.appendChild(f);
 
       macBody.appendChild(wrap);
