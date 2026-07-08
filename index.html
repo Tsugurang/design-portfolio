@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   setupWheelScroll();
   setupTextReveal();
   setupCustomCursor();
-  setupCriticalPrefetch();
+  setupEagerPreload();
 
   // ---- mac-window folders: placement, drag, magnetic hover ----
   function setupFolders(){
@@ -483,6 +483,31 @@ document.addEventListener('DOMContentLoaded',()=>{
     }catch(e){}
   }
 
+  // Builds (or returns) the hidden wrap+iframe for a work page. Shared by
+  // activateTab (on click) and setupEagerPreload (background, on site entry),
+  // so whichever runs first wins and the other reuses it.
+  function createFrame(link){
+    if(iframes[link])return iframes[link];
+    const wrap=document.createElement('div');
+    wrap.className='frame-wrap';
+    const f=document.createElement('iframe');
+    f.className='content-frame';
+    f.src=link;
+    f.addEventListener('load',()=>{
+      wrap.dataset.loaded='1';
+      wrap.classList.add('pop');
+      bridgeCursorIntoIframe(f);
+      if(activeLink===link){
+        hideLoader();
+        wrap.style.display='block';
+      }
+    });
+    wrap.appendChild(f);
+    macBody.appendChild(wrap);
+    iframes[link]=wrap;
+    return wrap;
+  }
+
   function activateTab(link,originFolder){
     activeLink=link;
     document.querySelectorAll('.tab').forEach(tab=>tab.classList.remove('active'));
@@ -490,34 +515,15 @@ document.addEventListener('DOMContentLoaded',()=>{
     Object.values(iframes).forEach(f=>{f.style.display='none';});
     hideLoader();
     if(link==='home')return;
-    if(!iframes[link]){
-      const wrap=document.createElement('div');
-      wrap.className='frame-wrap';
-      if(originFolder){
-        const macRect=macBody.getBoundingClientRect();
-        const fRect=originFolder.getBoundingClientRect();
-        wrap.style.setProperty('--origin-x',`${((fRect.left+fRect.width/2-macRect.left)/macRect.width*100).toFixed(1)}%`);
-        wrap.style.setProperty('--origin-y',`${((fRect.top+fRect.height/2-macRect.top)/macRect.height*100).toFixed(1)}%`);
-      }
-
-      const f=document.createElement('iframe');
-      f.className='content-frame';
-      f.src=link;
-      f.addEventListener('load',()=>{
-        wrap.dataset.loaded='1';
-        wrap.classList.add('pop');
-        bridgeCursorIntoIframe(f);
-        if(activeLink===link){
-          hideLoader();
-          wrap.style.display='block';
-        }
-      });
-      wrap.appendChild(f);
-
-      macBody.appendChild(wrap);
-      iframes[link]=wrap;
+    const wrap=createFrame(link);
+    // The open animation's origin is set at activation (not creation) time,
+    // since preloaded frames are built long before any folder is clicked.
+    if(originFolder){
+      const macRect=macBody.getBoundingClientRect();
+      const fRect=originFolder.getBoundingClientRect();
+      wrap.style.setProperty('--origin-x',`${((fRect.left+fRect.width/2-macRect.left)/macRect.width*100).toFixed(1)}%`);
+      wrap.style.setProperty('--origin-y',`${((fRect.top+fRect.height/2-macRect.top)/macRect.height*100).toFixed(1)}%`);
     }
-    const wrap=iframes[link];
     if(wrap.dataset.loaded){
       wrap.style.display='block';
     }else{
@@ -641,36 +647,26 @@ document.addEventListener('DOMContentLoaded',()=>{
     });
   }
 
-  // ---- warm the browser cache for each folder's heaviest first-view image ----
-  // Only the single image each viewer shows immediately (not lazy-loaded
-  // gallery extras) is prefetched, so this stays a fraction of the full
-  // gallery weight. Hovering/touching a folder jumps it to the front of the
-  // queue; everything else fills in sequentially (never in parallel - that
-  // starved whatever the user actually opened) once the page is idle.
-  function setupCriticalPrefetch(){
-    const critical={
-      'image-viewer.html?img=Typography.png':'Typography.png',
-      'image-viewer2.html':'j/j1.png',
-      'image-viewer.html?img=Frame 9.png':'Frame 9.png',
-      'image-viewer.html?img=bx.webp':'bx.webp',
-      'image-viewer3.html':'c1.png',
-      'image-viewer4.html':'RAP.png',
-    };
-    const done=new Set();
-    function prefetch(url){
-      if(done.has(url))return Promise.resolve();
-      done.add(url);
-      return fetch(encodeURI(url),{priority:'low'}).catch(()=>{});
-    }
-    folders.forEach(folder=>{
-      const url=critical[folder.getAttribute('data-link')];
-      if(!url)return;
-      const trigger=()=>prefetch(url);
-      folder.addEventListener('mouseenter',trigger,{once:true});
-      folder.addEventListener('touchstart',trigger,{once:true,passive:true});
+  // ---- pre-build every work page in the background on site entry ----
+  // Instead of only warming the HTTP cache with fetch(), the actual hidden
+  // iframes are created up front, so the HTML is parsed and images are
+  // decoded before any folder is clicked - opening one is then instant,
+  // with no loading veil at all. Frames load strictly one at a time
+  // (parallel loading starved whatever the user actually clicked), and
+  // hovering/touching a folder pulls its page to the front of the queue.
+  function setupEagerPreload(){
+    const links=[...folders].map(fo=>fo.getAttribute('data-link'));
+    const loadedOf=wrap=>wrap.dataset.loaded?Promise.resolve():new Promise(res=>{
+      wrap.querySelector('iframe').addEventListener('load',res,{once:true});
     });
-    const queue=Object.values(critical);
-    const run=async()=>{for(const url of queue)await prefetch(url);};
+    folders.forEach(fo=>{
+      const bump=()=>createFrame(fo.getAttribute('data-link'));
+      fo.addEventListener('mouseenter',bump,{once:true});
+      fo.addEventListener('touchstart',bump,{once:true,passive:true});
+    });
+    const run=async()=>{
+      for(const link of links)await loadedOf(createFrame(link));
+    };
     if('requestIdleCallback' in window)requestIdleCallback(run,{timeout:3000});
     else setTimeout(run,1000);
   }
