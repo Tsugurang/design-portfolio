@@ -53,8 +53,8 @@
     @keyframes fadeUp { 0% { opacity: 0; transform: translateY(40px); } 100% { opacity: 1; transform: translateY(0); } }
     .fade-up { opacity: 0; animation: fadeUp 1s ease-out forwards; animation-delay: 0.3s; }
 
-    .cursor-dot { position: fixed; top: 0; left: 0; width: 14px; height: 14px; border-radius: 50%; background: #fff; pointer-events: none; z-index: 9999; mix-blend-mode: difference; transform: translate3d(0,0,0) translate(-50%, -50%); transition: width 0.25s ease, height 0.25s ease, background 0.25s ease, opacity 0.15s ease; will-change: transform; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; color: transparent; }
-    .cursor-dot.hover { width: 64px; height: 64px; background: #000; color: #fff; mix-blend-mode: normal; }
+    .cursor-dot { position: fixed; top: 0; left: 0; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1.5px rgba(0,0,0,0.55); pointer-events: none; z-index: 9999; transform: translate3d(0,0,0) translate(-50%, -50%); transition: width 0.25s ease, height 0.25s ease, background 0.25s ease, opacity 0.15s ease; will-change: transform; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; letter-spacing: 0.04em; color: transparent; }
+    .cursor-dot.hover { width: 64px; height: 64px; background: #000; color: #fff; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.5); }
     @media (pointer: coarse) { .cursor-dot { display: none; } }
 
     @keyframes floaty { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
@@ -144,22 +144,19 @@
     .tab.active { background: var(--bg-light); font-weight: bold; color: var(--fg-dark); }
     .tab .close-btn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 4px; font-weight: bold; }
     .tab .close-btn:hover { background: rgba(0, 0, 0, 0.08); }
-    .frame-wrap { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 10; animation: genieOpen 0.55s cubic-bezier(.16,.85,.35,1); will-change: clip-path, transform, opacity; }
+    .frame-wrap { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; z-index: 10; animation: genieOpen 0.7s cubic-bezier(.22,.61,.2,1); will-change: clip-path, opacity; }
     iframe.content-frame { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none; background: var(--bg-light); }
     @keyframes genieOpen {
       0% {
         opacity: 0;
-        transform: scaleY(0.4);
         clip-path: polygon(var(--origin-x, 50%) var(--origin-y, 100%), var(--origin-x, 50%) var(--origin-y, 100%), var(--origin-x, 50%) var(--origin-y, 100%), var(--origin-x, 50%) var(--origin-y, 100%));
       }
-      45% {
-        opacity: 1;
-        transform: scaleY(1.06);
-        clip-path: polygon(calc(var(--origin-x, 50%) - 7%) 0%, calc(var(--origin-x, 50%) + 7%) 0%, calc(var(--origin-x, 50%) + 7%) 100%, calc(var(--origin-x, 50%) - 7%) 100%);
+      12% { opacity: 1; }
+      55% {
+        clip-path: polygon(calc(var(--origin-x, 50%) - 4%) 0%, calc(var(--origin-x, 50%) + 4%) 0%, calc(var(--origin-x, 50%) + 4%) 100%, calc(var(--origin-x, 50%) - 4%) 100%);
       }
       100% {
         opacity: 1;
-        transform: scaleY(1);
         clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
       }
     }
@@ -324,6 +321,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   setupWheelScroll();
   setupTextReveal();
   setupCustomCursor();
+  setupCriticalPrefetch();
 
   // ---- mac-window folders: placement, drag, magnetic hover ----
   function setupFolders(){
@@ -562,6 +560,40 @@ document.addEventListener('DOMContentLoaded',()=>{
       el.addEventListener('mouseenter',()=>{cursorDot.classList.add('hover');cursorDot.textContent=el.classList.contains('folder')?'OPEN':'';});
       el.addEventListener('mouseleave',()=>{cursorDot.classList.remove('hover');cursorDot.textContent='';});
     });
+  }
+
+  // ---- warm the browser cache for each folder's heaviest first-view image ----
+  // Only the single image each viewer shows immediately (not lazy-loaded
+  // gallery extras) is prefetched, so this stays a fraction of the full
+  // gallery weight. Hovering/touching a folder jumps it to the front of the
+  // queue; everything else fills in sequentially (never in parallel - that
+  // starved whatever the user actually opened) once the page is idle.
+  function setupCriticalPrefetch(){
+    const critical={
+      'image-viewer.html?img=Typography.png':'Typography.png',
+      'image-viewer2.html':'j/j1.png',
+      'image-viewer.html?img=Frame 9.png':'Frame 9.png',
+      'image-viewer.html?img=bx.webp':'bx.webp',
+      'image-viewer3.html':'c1.png',
+      'image-viewer4.html':'RAP.png',
+    };
+    const done=new Set();
+    function prefetch(url){
+      if(done.has(url))return Promise.resolve();
+      done.add(url);
+      return fetch(encodeURI(url),{priority:'low'}).catch(()=>{});
+    }
+    folders.forEach(folder=>{
+      const url=critical[folder.getAttribute('data-link')];
+      if(!url)return;
+      const trigger=()=>prefetch(url);
+      folder.addEventListener('mouseenter',trigger,{once:true});
+      folder.addEventListener('touchstart',trigger,{once:true,passive:true});
+    });
+    const queue=Object.values(critical);
+    const run=async()=>{for(const url of queue)await prefetch(url);};
+    if('requestIdleCallback' in window)requestIdleCallback(run,{timeout:3000});
+    else setTimeout(run,1000);
   }
 
 });
