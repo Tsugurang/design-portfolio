@@ -12,7 +12,10 @@
   /* Comfortable reading width: long boards stretched across the whole mac
      window looked over-magnified, so the column is capped and centered
      with the page background filling the sides. The parent page adds
-     .max to <body> while the mac window is fullscreen, lifting the cap. */
+     .max to <body> while the mac window is fullscreen, raising the cap -
+     but still capped, not edge-to-edge: on a wide monitor an unconstrained
+     width also blows up the height of these tall boards, so far less of
+     it fits in one screenful and you end up scrolling constantly. */
   img {
     display: block;
     width: 100%;
@@ -21,7 +24,7 @@
     margin: 0 auto;
     box-shadow: 0 0 40px rgba(0, 0, 0, 0.12);
   }
-  body.max img { max-width: none; box-shadow: none; }
+  body.max img { max-width: 1400px; }
 </style>
 
 </head>
