@@ -318,6 +318,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   let activeLink='home';
   let loaderEl=null;
   let loaderTimer=null;
+  let forwardWheelDelta=null;
 
   function clamp(val,min,max){return Math.max(min,Math.min(max,val));}
 
@@ -487,17 +488,19 @@ document.addEventListener('DOMContentLoaded',()=>{
     },200);
   }
 
-  // The custom cursor's pointermove listener lives on our document, and
-  // events inside an iframe belong to the iframe's own document - so the
-  // dot used to just freeze at the window edge over opened work pages.
-  // All the viewers are same-origin local files, so we can reach in, hide
-  // the native cursor there too, and forward the iframe's pointer position
-  // (offset by the iframe's own screen position) into the shared tracker.
-  function bridgeCursorIntoIframe(f){
+  // Bridges the shared cursor and page-scroll logic into an opened work
+  // page. The viewers are all same-origin local files, so we can reach in.
+  function bridgeIframe(f){
     if(isTouch)return;
     try{
       const doc=f.contentDocument;
       if(!doc||!doc.head)return;
+
+      // The cursor's pointermove listener lives on our document, and events
+      // inside an iframe belong to the iframe's own document - so the dot
+      // used to just freeze at the window edge over opened work pages.
+      // Hide the native cursor there too and forward its pointer position
+      // (offset by the iframe's own screen position) into the shared tracker.
       const st=doc.createElement('style');
       st.textContent='html,body{cursor:none!important}';
       doc.head.appendChild(st);
@@ -505,6 +508,22 @@ document.addEventListener('DOMContentLoaded',()=>{
         const r=f.getBoundingClientRect();
         positionCursor(r.left+ev.clientX,r.top+ev.clientY);
       });
+
+      // Same story for wheel: scrolling down through a tall work image and
+      // continuing past its bottom edge did nothing, because the wheel
+      // event fired inside the iframe and never reached the outer page's
+      // section-paging listener. Forward it only once the iframe's own
+      // scroll has hit the relevant edge, so scrolling through the work
+      // itself still behaves normally.
+      doc.addEventListener('wheel',ev=>{
+        const root=doc.scrollingElement||doc.documentElement;
+        const atBottom=root.scrollHeight-root.scrollTop-root.clientHeight<2;
+        const atTop=root.scrollTop<2;
+        if((ev.deltaY>0&&atBottom)||(ev.deltaY<0&&atTop)){
+          ev.preventDefault();
+          if(forwardWheelDelta)forwardWheelDelta(ev.deltaY);
+        }
+      },{passive:false});
     }catch(e){}
   }
 
@@ -521,7 +540,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     f.addEventListener('load',()=>{
       wrap.dataset.loaded='1';
       wrap.classList.add('pop');
-      bridgeCursorIntoIframe(f);
+      bridgeIframe(f);
       // frames that finish loading while already fullscreen need the
       // width-cap lift applied on arrival too
       if(macContainer.classList.contains('fullscreen')){
@@ -629,8 +648,12 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   function setupWheelScroll(){
     if(isTouch)return;
-    scrollContainer.addEventListener('wheel',e=>{
-      e.preventDefault();
+    // Shared by the outer page's own wheel listener and by bridgeIframe
+    // (see below) forwarding wheel events from inside opened work pages -
+    // scrolling down through a tall work image and continuing past its
+    // bottom edge did nothing, because the wheel event fired inside the
+    // iframe's own document and never reached this listener at all.
+    function handleDelta(deltaY){
       // Trackpads emit a trail of tiny, sometimes reversed-sign deltaY
       // events as a swipe decelerates (rubber-band/momentum simulation).
       // Reacting to those was firing a second, opposite-direction page jump
@@ -643,8 +666,13 @@ document.addEventListener('DOMContentLoaded',()=>{
       // paging the sections behind it would just silently change where
       // the user lands when they exit.
       if(macContainer.classList.contains('fullscreen'))return;
-      if(isScrollAnimating||Math.abs(e.deltaY)<4||performance.now()-lastScrollEnd<300)return;
-      scrollToIndex(currentSectionIndex+(e.deltaY>0?1:-1));
+      if(isScrollAnimating||Math.abs(deltaY)<4||performance.now()-lastScrollEnd<300)return;
+      scrollToIndex(currentSectionIndex+(deltaY>0?1:-1));
+    }
+    forwardWheelDelta=handleDelta;
+    scrollContainer.addEventListener('wheel',e=>{
+      e.preventDefault();
+      handleDelta(e.deltaY);
     },{passive:false});
   }
 
