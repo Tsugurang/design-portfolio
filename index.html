@@ -135,11 +135,17 @@
     .mac-container.fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; max-height: none; aspect-ratio: auto; border-radius: 0; border: none; margin: 0; z-index: 100; animation: zoomIn 0.35s ease-out; }
     @keyframes zoomIn { from { transform: scale(0.96); opacity: 0.5; } to { transform: scale(1); opacity: 1; } }
     .mac-titlebar { height: 36px; background: #efefef; display: flex; align-items: center; padding: 0 10px; border-bottom: 1px solid var(--border); }
-    .mac-buttons { display: flex; gap: 6px; }
+    .mac-buttons { position: relative; display: flex; gap: 6px; }
     .mac-buttons div { width: 12px; height: 12px; border-radius: 50%; }
     .close { background: #ff5f56; }
     .minimize { background: #ffbd2e; }
     .maximize { background: #27c93f; }
+    /* Coach mark pointing at the minimize button, shown once when the
+       Projects section auto-expands to fullscreen for the first time, so
+       there's an obvious way back to the normal size. */
+    .coach-mark { position: absolute; top: 26px; left: 18px; transform: translate(-50%, -6px); background: #1a1a1a; color: #fff; font-size: 0.78rem; font-weight: 500; letter-spacing: -0.01em; padding: 7px 12px; border-radius: 8px; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.3); opacity: 0; pointer-events: none; transition: opacity 0.3s ease, transform 0.3s ease; z-index: 5; }
+    .coach-mark::before { content: ''; position: absolute; top: -4px; left: 50%; transform: translateX(-50%) rotate(45deg); width: 8px; height: 8px; background: #1a1a1a; }
+    .coach-mark.show { opacity: 1; transform: translate(-50%, 0); }
     .mac-body { position: relative; width: 100%; height: 100%; padding: 3rem 4rem; box-sizing: border-box; }
     .folder { position: absolute; text-align: center; user-select: none; transition: transform 0.2s ease-out; }
     .folder img { width: 130px; filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.12)); transition: transform 0.25s ease, filter 0.25s ease; animation: floaty 3.4s ease-in-out infinite; }
@@ -270,7 +276,12 @@
   <div class="section" id="projects">
     <div class="mac-container" id="macContainer">
       <div class="mac-titlebar">
-        <div class="mac-buttons"><div class="close"></div><div class="minimize"></div><div class="maximize"></div></div>
+        <div class="mac-buttons">
+          <div class="close"></div>
+          <div class="minimize"></div>
+          <div class="maximize"></div>
+          <div class="coach-mark" id="coachMark">눌러서 원래 크기로</div>
+        </div>
         <div class="tab-bar"><div class="tab active" data-link="home"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-label="home"><path d="M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z"/></svg></div></div>
       </div>
       <div class="mac-body" id="macBody">
@@ -304,6 +315,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const folders=macBody.querySelectorAll('.folder');
   const tabBar=document.querySelector('.tab-bar');
   const cursorDot=document.getElementById('cursorDot');
+  const coachMark=document.getElementById('coachMark');
   const sections=Array.from(document.querySelectorAll('.scroll-container > .section'));
 
   const tabs={};
@@ -318,6 +330,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   let loaderEl=null;
   let loaderTimer=null;
   let forwardWheelDelta=null;
+  let projectsAutoFullscreenDone=false;
+  let coachMarkTimer=null;
 
   function clamp(val,min,max){return Math.max(min,Math.min(max,val));}
 
@@ -441,6 +455,18 @@ document.addEventListener('DOMContentLoaded',()=>{
   function setFullscreen(on){
     macContainer.classList.toggle('fullscreen',on);
     setViewerMax(on);
+    if(!on)hideCoachMark();
+  }
+
+  function showCoachMark(){
+    coachMark.classList.add('show');
+    clearTimeout(coachMarkTimer);
+    coachMarkTimer=setTimeout(hideCoachMark,5000);
+  }
+
+  function hideCoachMark(){
+    coachMark.classList.remove('show');
+    clearTimeout(coachMarkTimer);
   }
 
   function setupWindowButtons(){
@@ -613,6 +639,15 @@ document.addEventListener('DOMContentLoaded',()=>{
           dotButtons.forEach(b=>b.classList.remove('active'));
           dotButtons[idx].classList.add('active');
           dotsNav.classList.toggle('on-dark',entry.target.id==='contact');
+          // First time the Projects section settles into view, auto-expand
+          // the mac window to fullscreen (same effect as the green button)
+          // so the work is never seen cramped by default - only once per
+          // visit, with a short delay so it doesn't collide with the
+          // section's own fade-in transition.
+          if(entry.target.id==='projects'&&!projectsAutoFullscreenDone){
+            projectsAutoFullscreenDone=true;
+            setTimeout(()=>{setFullscreen(true);showCoachMark();},500);
+          }
         }
       });
     },{threshold:0.5});
