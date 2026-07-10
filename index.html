@@ -134,11 +134,13 @@
       .about-content { grid-template-columns: 1fr; gap: 2rem; }
     }
 
-    .mac-container { margin: 0 auto; background: var(--bg-light); border: 1px solid var(--border); border-radius: 20px; width: 90%; aspect-ratio: 16 / 9; max-height: 90vh; overflow: hidden; position: relative; display: flex; flex-direction: column; box-shadow: var(--shadow); z-index: 100; }
+    .mac-container { margin: 0 auto; background: var(--bg-light); border: 1px solid var(--border); border-radius: 20px; width: 90%; aspect-ratio: 16 / 9; max-height: 90vh; overflow: hidden; position: relative; display: flex; flex-direction: column; box-shadow: var(--shadow); z-index: 100; transform-origin: top left; }
     /* Fullscreen: green grows the window to fill the viewport, yellow
-       shrinks it back. Escape also exits. */
+       shrinks it back. Escape also exits. The grow/shrink is a JS-driven
+       FLIP (see animateFullscreen): real before/after rects are measured
+       and bridged with a transform + border-radius transition, so it's
+       always the real window growing/shrinking between its real positions. */
     .mac-container.fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; max-height: none; aspect-ratio: auto; border-radius: 0; border: none; margin: 0; z-index: 100; }
-    .mac-container.fs-anim { transition: transform 1s cubic-bezier(.2,.7,.2,1); }
     .fs-backdrop { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 99; transition: opacity 0.4s ease; }
     .fs-backdrop.show { opacity: 0.55; }
     .mac-titlebar { height: 46px; background: #efefef; display: flex; align-items: center; padding: 0 10px; border-bottom: 1px solid var(--border); }
@@ -484,46 +486,95 @@ document.addEventListener('DOMContentLoaded',()=>{
   // whichever the user last actually chose instead of always resetting to
   // mini, which read as the fullscreen toggle just not sticking.
   let userWantsFullscreen=false;
-  let fsAnimTimer=null;
+  let fsAnimToken=0;
+  const FS_DURATION=700;
 
-  function clearMacRect(){
-    macContainer.classList.remove('fs-anim');
-    macContainer.style.transform='';
+  // The backdrop only darkens behind the window while it's small enough for
+  // anything behind it to actually show (mini mode, on Projects) - once the
+  // window is fullscreen it already covers the whole viewport, so leaving
+  // the backdrop "on" underneath it just risks a flash of black if the two
+  // ever fall out of sync (e.g. an instant, unanimated exit).
+  function updateBackdrop(){
+    const onProjects=sections[currentSectionIndex]&&sections[currentSectionIndex].id==='projects';
+    fsBackdrop.classList.toggle('show',onProjects&&!macContainer.classList.contains('fullscreen'));
   }
 
-  // animate=true: transform:scale() transitions (~1s) between 1 (full
-  // viewport) and 0.45 (noticeably smaller, so the grow/shrink is
-  // unmistakable). scale() rescales the whole rendered window - titlebar,
-  // tabs, folders - as one piece, so it stays visibly the same window the
-  // whole time, not a resized box with clipped contents. animate=false
-  // snaps instantly - used for the silent exit/restore when scrolling
-  // between sections, which must not replay the show-piece animation
-  // every time. The backdrop is handled separately (see setupScrollReveal)
-  // since it now stays on for as long as Projects is the active section,
-  // not just during this transition.
+  function clearFsInlineStyles(){
+    macContainer.style.transition='';
+    macContainer.style.transform='';
+    macContainer.style.borderRadius='';
+  }
+
+  // Instant, no transition - used for the silent exit/restore when
+  // scrolling between sections, which must not replay the grow/shrink
+  // show-piece every time.
+  function snapFullscreen(on){
+    fsAnimToken++;
+    clearFsInlineStyles();
+    macContainer.classList.toggle('fullscreen',on);
+    updateBackdrop();
+    setViewerMax(on);
+  }
+
+  // A real FLIP: measure the window's actual on-screen rect and corner
+  // radius before toggling the .fullscreen class, measure again right after
+  // (the class swap snaps it straight to the target - fixed and covering
+  // the viewport, or back to its normal flex-centered mini box), then
+  // bridge the two with a transform + border-radius transition. Driven by
+  // the real rects both ways, so it always grows from - and shrinks back
+  // to - the window's actual size and position, never a guessed constant.
+  // Reading the rect again mid-flight (if called again before a previous
+  // run finished) picks up wherever it visually is right now, so an
+  // interrupted animation reverses cleanly instead of jumping.
+  function animateFullscreen(on){
+    const token=++fsAnimToken;
+    const firstRect=macContainer.getBoundingClientRect();
+    const startRadius=getComputedStyle(macContainer).borderRadius;
+
+    clearFsInlineStyles();
+    macContainer.classList.toggle('fullscreen',on);
+    updateBackdrop();
+
+    const lastRect=macContainer.getBoundingClientRect();
+    const lastRadius=getComputedStyle(macContainer).borderRadius;
+
+    const dx=firstRect.left-lastRect.left;
+    const dy=firstRect.top-lastRect.top;
+    const sx=firstRect.width/lastRect.width;
+    const sy=firstRect.height/lastRect.height;
+
+    macContainer.style.transform=`translate(${dx}px,${dy}px) scale(${sx},${sy})`;
+    macContainer.style.borderRadius=startRadius;
+    macContainer.getBoundingClientRect(); // commit the "still looks like before" state before enabling the transition
+
+    // The corner radius holds steady for the first chunk of the motion and
+    // only unwinds in the last stretch, so it reads as "still rounded while
+    // obviously resizing, resolves to square/round once it's basically
+    // arrived" - transitioning it over the full duration from frame one
+    // looked like the corners melting away immediately, which was wrong.
+    macContainer.style.transition=`transform ${FS_DURATION}ms cubic-bezier(.2,.7,.2,1), border-radius ${Math.round(FS_DURATION*0.4)}ms ease ${Math.round(FS_DURATION*0.6)}ms`;
+    requestAnimationFrame(()=>{
+      if(token!==fsAnimToken)return;
+      macContainer.style.transform='';
+      macContainer.style.borderRadius=lastRadius;
+    });
+
+    // The viewer's image width-cap swap reflows a same-origin iframe -
+    // doing that mid-transition looked like an awkwardly different-sized
+    // image popping in partway through the grow. Deferred until the window
+    // has actually finished resizing.
+    setTimeout(()=>{
+      if(token!==fsAnimToken)return;
+      clearFsInlineStyles();
+      setViewerMax(on);
+    },FS_DURATION+50);
+  }
+
   function setFullscreen(on,persistPreference,animate){
     if(persistPreference)userWantsFullscreen=on;
     if(on===macContainer.classList.contains('fullscreen'))return;
-    clearTimeout(fsAnimTimer);
-    clearMacRect();
-    if(!animate){
-      macContainer.classList.toggle('fullscreen',on);
-    }else if(on){
-      macContainer.classList.add('fullscreen');
-      macContainer.style.transform='scale(0.45)';
-      macContainer.getBoundingClientRect(); // commit the shrunk state before enabling the transition
-      macContainer.classList.add('fs-anim');
-      requestAnimationFrame(()=>{macContainer.style.transform='';});
-      fsAnimTimer=setTimeout(clearMacRect,1050);
-    }else{
-      macContainer.classList.add('fs-anim');
-      requestAnimationFrame(()=>{macContainer.style.transform='scale(0.45)';});
-      fsAnimTimer=setTimeout(()=>{
-        macContainer.classList.remove('fullscreen');
-        clearMacRect();
-      },1050);
-    }
-    setViewerMax(on);
+    if(animate)animateFullscreen(on);
+    else snapFullscreen(on);
     if(!on)hideCoachMark();
   }
 
@@ -708,10 +759,7 @@ document.addEventListener('DOMContentLoaded',()=>{
           dotButtons.forEach(b=>b.classList.remove('active'));
           dotButtons[idx].classList.add('active');
           dotsNav.classList.toggle('on-dark',entry.target.id==='contact');
-          // Backdrop dims behind the mac window in its normal mini size
-          // too, not just during the fullscreen transition - stays on for
-          // as long as Projects is the active section either way.
-          fsBackdrop.classList.toggle('show',entry.target.id==='projects');
+          updateBackdrop();
           if(entry.target.id==='projects'){
             if(!projectsAutoFullscreenDone){
               // First time the Projects section settles into view, auto-
