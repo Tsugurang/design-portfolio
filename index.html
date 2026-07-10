@@ -786,6 +786,19 @@ document.addEventListener('DOMContentLoaded',()=>{
   function scrollToIndex(index){
     index=Math.max(0,Math.min(sections.length-1,index));
     currentSectionIndex=index;
+    // Enter/exit fullscreen (per the user's standing preference) right now,
+    // before the target section is actually visible, so the mac window is
+    // already in its final state by the time it scrolls into view. Leaving
+    // this to the section observer meant it only fired once the section
+    // crossed the 50% visibility threshold mid-scroll - an instant snap
+    // (grow or shrink) while the page was still visibly moving, which read
+    // as a flash/flicker every time Projects came back into view.
+    const targetIsProjects=sections[index].id==='projects';
+    if(macContainer.classList.contains('fullscreen')&&!targetIsProjects){
+      setFullscreen(false,false,false);
+    }else if(targetIsProjects&&projectsAutoFullscreenDone&&userWantsFullscreen&&!macContainer.classList.contains('fullscreen')){
+      setFullscreen(true,false,false);
+    }
     const startY=scrollContainer.scrollTop;
     const targetY=sections[index].offsetTop;
     const distance=targetY-startY;
@@ -825,13 +838,8 @@ document.addEventListener('DOMContentLoaded',()=>{
       // finished (a short grace period keyed off the single isScrollAnimating
       // clock instead of a second, independently-drifting timer).
       if(isScrollAnimating||Math.abs(deltaY)<4||performance.now()-lastScrollEnd<300)return;
-      // The mac window covers the whole viewport while fullscreen, so a
-      // page-change scroll exits it first instead of silently changing
-      // what section is waiting underneath (or just eating the scroll,
-      // which read as scrolling away from Projects being broken). Not
-      // persisted as a preference change - scrolling back to Projects
-      // restores fullscreen if that's genuinely what the user had chosen.
-      if(macContainer.classList.contains('fullscreen'))setFullscreen(false,false,false);
+      // Entering/exiting fullscreen for the target section is handled inside
+      // scrollToIndex itself, before this scroll animation even starts.
       scrollToIndex(currentSectionIndex+(deltaY>0?1:-1));
     }
     forwardWheelDelta=handleDelta;
