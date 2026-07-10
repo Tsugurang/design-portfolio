@@ -144,11 +144,15 @@
        section) and, because the layout snaps to full size in the same
        frame, flashed one full-size frame first - reading as a brand-new
        window materializing. The grow/shrink is now driven from JS
-       (setFullscreen) by transitioning the window's actual rect between
-       its real in-page position and the full viewport, so it's visibly
-       the same window stretching, and only when animation is requested. */
+       (setFullscreen) via a transform:scale() transition - tried resizing
+       the actual width/height instead, but the folders inside are
+       absolutely positioned in raw pixels for the full-size layout, so
+       shrinking the box that way just clipped most of them out of view
+       instead of shrinking the whole mac UI coherently. scale() rescales
+       the whole rendered window - titlebar, tabs, folders - as one piece,
+       so what's growing is unmistakably the same window, not a generic box. */
     .mac-container.fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; max-height: none; aspect-ratio: auto; border-radius: 0; border: none; margin: 0; z-index: 100; }
-    .mac-container.fs-anim { transition: left 1s cubic-bezier(.2,.7,.2,1), top 1s cubic-bezier(.2,.7,.2,1), width 1s cubic-bezier(.2,.7,.2,1), height 1s cubic-bezier(.2,.7,.2,1), border-radius 1s ease; }
+    .mac-container.fs-anim { transition: transform 1s cubic-bezier(.2,.7,.2,1), border-radius 1s ease; }
     /* Dims the rest of the page under the growing/shrinking window so the
        size change reads as the clear focal point instead of competing with
        everything else still on screen behind it. */
@@ -499,28 +503,22 @@ document.addEventListener('DOMContentLoaded',()=>{
   let userWantsFullscreen=false;
   let fsAnimTimer=null;
 
-  function setMacRect(left,top,width,height,radius){
-    macContainer.style.left=left+'px';
-    macContainer.style.top=top+'px';
-    macContainer.style.width=width+'px';
-    macContainer.style.height=height+'px';
-    macContainer.style.borderRadius=radius+'px';
-  }
-
   function clearMacRect(){
     macContainer.classList.remove('fs-anim');
-    macContainer.style.left=macContainer.style.top='';
-    macContainer.style.width=macContainer.style.height='';
+    macContainer.style.transform='';
     macContainer.style.borderRadius='';
   }
 
-  // animate=true: the window's actual rect is transitioned (~1s) between
-  // the full viewport and a starting box noticeably smaller than the real
-  // window (45% of it, centered on the same spot) - growing from exactly
-  // the real size read as too subtle to notice, so the start point is
-  // deliberately exaggerated smaller. animate=false snaps instantly -
-  // used for the silent exit/restore when scrolling between sections,
-  // which must not replay the show-piece animation every time.
+  // animate=true: transform:scale() is transitioned (~1s) between 1 (full
+  // viewport) and 0.45 (noticeably smaller - growing from exactly 100%
+  // read as too subtle to register as "growing"). scale() rescales the
+  // whole rendered window as one piece, so the small state still visibly
+  // shows the real titlebar/tabs/folders, just shrunk - unlike resizing
+  // actual width/height, which left the absolutely-positioned folders
+  // clipped out instead of shrinking coherently with the window.
+  // animate=false snaps instantly - used for the silent exit/restore when
+  // scrolling between sections, which must not replay the show-piece
+  // animation every time.
   function setFullscreen(on,persistPreference,animate){
     if(persistPreference)userWantsFullscreen=on;
     if(on===macContainer.classList.contains('fullscreen'))return;
@@ -530,28 +528,18 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!animate){
       macContainer.classList.toggle('fullscreen',on);
     }else if(on){
-      const r=macContainer.getBoundingClientRect();
-      const shrink=0.45;
-      const startW=r.width*shrink,startH=r.height*shrink;
-      const startLeft=r.left+(r.width-startW)/2,startTop=r.top+(r.height-startH)/2;
       macContainer.classList.add('fullscreen');
-      setMacRect(startLeft,startTop,startW,startH,20);
-      macContainer.getBoundingClientRect(); // commit the small rect before enabling the transition
+      macContainer.style.transform='scale(0.45)';
+      macContainer.style.borderRadius='20px';
+      macContainer.getBoundingClientRect(); // commit the shrunk state before enabling the transition
       macContainer.classList.add('fs-anim');
       fsBackdrop.classList.add('show');
-      requestAnimationFrame(()=>setMacRect(0,0,window.innerWidth,window.innerHeight,0));
+      requestAnimationFrame(()=>{macContainer.style.transform='';macContainer.style.borderRadius='0px';});
       fsAnimTimer=setTimeout(()=>{clearMacRect();fsBackdrop.classList.remove('show');},1050);
     }else{
-      // measure where the window will sit in normal flow (class off/on
-      // within one frame - nothing paints in between)
-      macContainer.classList.remove('fullscreen');
-      const target=macContainer.getBoundingClientRect();
-      macContainer.classList.add('fullscreen');
-      setMacRect(0,0,window.innerWidth,window.innerHeight,0);
-      macContainer.getBoundingClientRect();
       macContainer.classList.add('fs-anim');
       fsBackdrop.classList.add('show');
-      requestAnimationFrame(()=>setMacRect(target.left,target.top,target.width,target.height,20));
+      requestAnimationFrame(()=>{macContainer.style.transform='scale(0.45)';macContainer.style.borderRadius='20px';});
       fsAnimTimer=setTimeout(()=>{
         macContainer.classList.remove('fullscreen');
         clearMacRect();
