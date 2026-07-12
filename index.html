@@ -97,6 +97,11 @@
       display: flex;
       justify-content: center;
       align-items: center;
+      /* Plain, permanent dark background (not an animated overlay) so the
+         mac window always sits on a dark backdrop from the very first
+         frame it's rendered - no fade-in, so nothing to flash or race
+         against scroll/animation timing. */
+      background: var(--bg-dark);
     }
     .about-content {
       width: 100%;
@@ -141,8 +146,6 @@
        and bridged with a transform + border-radius transition, so it's
        always the real window growing/shrinking between its real positions. */
     .mac-container.fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; max-height: none; aspect-ratio: auto; border-radius: 0; border: none; margin: 0; z-index: 100; }
-    .fs-backdrop { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 99; transition: opacity 0.4s ease; }
-    .fs-backdrop.show { opacity: 0.55; }
     .mac-titlebar { height: 46px; background: #efefef; display: flex; align-items: center; padding: 0 10px; border-bottom: 1px solid var(--border); }
     .mac-buttons { position: relative; display: flex; gap: 6px; }
     .mac-buttons > .close, .mac-buttons > .minimize, .mac-buttons > .maximize { width: 12px; height: 12px; border-radius: 50%; }
@@ -225,7 +228,6 @@
 </head>
 <body>
 <div class="cursor-dot" id="cursorDot"></div>
-<div class="fs-backdrop" id="fsBackdrop"></div>
 <div class="scroll-container" id="scrollContainer">
   <div class="section" id="home" style="display: flex; align-items: center; justify-content: flex-start; padding-left: 8vw; background: linear-gradient(to bottom, transparent 65%, var(--bg-light) 100%), radial-gradient(circle at center, #007bff, #00c6ff, #d9faff); text-align: left; overflow: hidden;">
     <div class="fade-up" style="position: absolute; top: 20%; left: 8vw; transform: translateY(-50%);">
@@ -330,7 +332,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   const folders=macBody.querySelectorAll('.folder');
   const tabBar=document.querySelector('.tab-bar');
   const cursorDot=document.getElementById('cursorDot');
-  const fsBackdrop=document.getElementById('fsBackdrop');
   const coachMark=document.getElementById('coachMark');
   const sections=Array.from(document.querySelectorAll('.scroll-container > .section'));
 
@@ -489,21 +490,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   let fsAnimToken=0;
   const FS_DURATION=700;
 
-  // The backdrop only darkens behind the window while it's small enough for
-  // anything behind it to actually show (mini mode, on Projects) - once the
-  // window is fullscreen it already covers the whole viewport, so leaving
-  // the backdrop "on" underneath it just risks a flash of black if the two
-  // ever fall out of sync (e.g. an instant, unanimated exit).
-  function updateBackdrop(){
-    // Also gated on the scroll having actually settled: the observer's 50%
-    // threshold fires mid-scroll, while the page is still visibly moving,
-    // and popping the backdrop on right then read as a black flash before
-    // the section had even finished arriving. scrollToIndex re-checks this
-    // once the scroll animation completes so it still shows once relevant.
-    const onProjects=sections[currentSectionIndex]&&sections[currentSectionIndex].id==='projects';
-    fsBackdrop.classList.toggle('show',onProjects&&!macContainer.classList.contains('fullscreen')&&!isScrollAnimating);
-  }
-
   // Runs cb immediately if the eased scroll (scrollToIndex) isn't currently
   // animating, otherwise waits for it to finish first.
   function whenScrollSettled(cb){
@@ -527,7 +513,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     fsAnimToken++;
     clearFsInlineStyles();
     macContainer.classList.toggle('fullscreen',on);
-    updateBackdrop();
     setViewerMax(on);
   }
 
@@ -548,15 +533,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 
     clearFsInlineStyles();
     macContainer.classList.toggle('fullscreen',on);
-    // Growing: leave the backdrop as-is (already dark, from mini mode) for
-    // the whole motion, only clearing it once actually fullscreen (in the
-    // setTimeout below) - turning it off in sync with the grow made it fade
-    // back to nothing before the window had finished expanding, showing a
-    // sliver of the plain page background at the edges instead of staying
-    // dark. Shrinking is the mirror case and doesn't have this problem
-    // (fading dark IN while shrinking never exposes anything lighter), so
-    // it updates immediately.
-    if(!on)updateBackdrop();
 
     const lastRect=macContainer.getBoundingClientRect();
     const lastRadius=getComputedStyle(macContainer).borderRadius;
@@ -590,7 +566,6 @@ document.addEventListener('DOMContentLoaded',()=>{
       if(token!==fsAnimToken)return;
       clearFsInlineStyles();
       setViewerMax(on);
-      if(on)updateBackdrop();
     },FS_DURATION+50);
   }
 
@@ -782,8 +757,7 @@ document.addEventListener('DOMContentLoaded',()=>{
           currentSectionIndex=idx;
           dotButtons.forEach(b=>b.classList.remove('active'));
           dotButtons[idx].classList.add('active');
-          dotsNav.classList.toggle('on-dark',entry.target.id==='contact');
-          updateBackdrop();
+          dotsNav.classList.toggle('on-dark',entry.target.id==='contact'||entry.target.id==='projects');
           if(entry.target.id==='projects'){
             if(!projectsAutoFullscreenDone){
               // First time the Projects section settles into view, auto-
@@ -791,11 +765,9 @@ document.addEventListener('DOMContentLoaded',()=>{
               // green button) so the work is never seen cramped by default -
               // only once per visit. Waits for the scroll to actually finish
               // (the 50% threshold fires mid-scroll) before the short pause
-              // and grow, so the mini view + backdrop only appear once the
-              // page has stopped moving, not mid-flight.
+              // and grow, so it doesn't trigger mid-flight.
               projectsAutoFullscreenDone=true;
               whenScrollSettled(()=>{
-                updateBackdrop();
                 setTimeout(()=>{setFullscreen(true,true,true);showCoachMark();},500);
               });
             }else if(userWantsFullscreen&&!macContainer.classList.contains('fullscreen')){
@@ -836,7 +808,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     // notices it's been superseded and stops touching scrollTop, instead of
     // two rAF loops fighting over it and making the scroll look stuck.
     const myToken=++scrollToken;
-    if(Math.abs(distance)<1){isScrollAnimating=false;lastScrollEnd=performance.now();updateBackdrop();return;}
+    if(Math.abs(distance)<1){isScrollAnimating=false;lastScrollEnd=performance.now();return;}
     isScrollAnimating=true;
     const duration=850;
     const startTime=performance.now();
@@ -845,7 +817,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       const t=Math.min((now-startTime)/duration,1);
       scrollContainer.scrollTop=startY+distance*easeInOutCubic(t);
       if(t<1)requestAnimationFrame(step);
-      else{isScrollAnimating=false;lastScrollEnd=performance.now();updateBackdrop();}
+      else{isScrollAnimating=false;lastScrollEnd=performance.now();}
     }
     requestAnimationFrame(step);
   }
