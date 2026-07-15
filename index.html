@@ -418,51 +418,70 @@ document.addEventListener('DOMContentLoaded',()=>{
     const labelH=tallest.getBoundingClientRect().height-naturalImgH;
     const naturalW=130;
 
-    // Search row counts for the grid that needs the least icon shrinking to
-    // fit all n folders without overlap - a smaller window (or simply more
-    // folders than the desktop has room for at full size) means the fixed
-    // 130px icon size doesn't always fit, and guessing a single fixed grid
-    // shape (e.g. "however many rows fit at full size") could force an
-    // unreasonably cramped one (all n folders in a single row) instead of a
-    // more balanced grid at a mild scale-down.
+    // Columns, not a grid: folders are split into random-width-matched
+    // columns and stacked top to bottom within their own column with a
+    // random gap after each one, instead of snapping to one of a small
+    // number of shared row bands. A grid with per-cell jitter still reads
+    // as rows at a glance - the whole desktop visibly splits into "the top
+    // cluster" and "the bottom cluster" no matter how much wobble each
+    // folder gets inside its own cell, because every column still bottoms
+    // out at the same row boundaries. Independent per-column stacking has
+    // no shared row boundaries to line up on, and still can't overlap:
+    // columns partition the width so different columns never meet
+    // horizontally, and within one column each folder is placed strictly
+    // below the last.
     let best=null;
-    for(let rows=1;rows<=n;rows++){
-      const cols=Math.ceil(n/rows);
-      const scale=Math.min(1,
-        ((containerRect.width-padding)/cols-padding)/naturalW,
-        ((containerRect.height-padding)/rows-padding-labelH)/naturalImgH
-      );
-      if(!best||scale>best.scale)best={rows,cols,scale};
+    for(let cols=1;cols<=n;cols++){
+      const maxPerCol=Math.ceil(n/cols);
+      const widthScale=((containerRect.width-padding)/cols-padding)/naturalW;
+      const heightScale=maxPerCol>0
+        ?((containerRect.height-padding)-(maxPerCol-1)*padding-maxPerCol*labelH)/(maxPerCol*naturalImgH)
+        :1;
+      const scale=Math.min(1,widthScale,heightScale);
+      if(!best||scale>best.scale)best={cols,scale};
     }
-    const {rows,cols,scale}=best;
+    const {cols,scale}=best;
     if(scale<1)folders.forEach(folder=>{folder.querySelector('img').style.width=`${Math.max(40,naturalW*scale)}px`;});
 
-    // Each folder then gets a random offset within its own cell (stretched
-    // to fill the real available space, not just the minimum needed) so the
-    // result reads as scattered rather than a visible grid, and which
-    // folder lands in which cell is shuffled too.
     const sizes=[...folders].map(f=>{const r=f.getBoundingClientRect();return{w:r.width,h:r.height};});
     const cellW=(containerRect.width-padding)/cols;
-    const cellH=(containerRect.height-padding)/rows;
-    const cellOrder=[...Array(cols*rows).keys()];
-    for(let i=cellOrder.length-1;i>0;i--){
+
+    // Deal folders out to columns round-robin after shuffling, so it's
+    // random which folders end up sharing a column (and columns come out
+    // roughly balanced in count) rather than always the first cols folders
+    // in DOM order.
+    const order=[...folders].map((_,i)=>i);
+    for(let i=order.length-1;i>0;i--){
       const j=Math.floor(Math.random()*(i+1));
-      [cellOrder[i],cellOrder[j]]=[cellOrder[j],cellOrder[i]];
+      [order[i],order[j]]=[order[j],order[i]];
     }
+    const columns=Array.from({length:cols},()=>[]);
+    order.forEach((idx,i)=>columns[i%cols].push(idx));
 
-    folders.forEach((folder,i)=>{
-      const {w,h}=sizes[i];
-      const cell=cellOrder[i];
-      const cellLeft=padding+(cell%cols)*cellW,cellTop=padding+Math.floor(cell/cols)*cellH;
-      const x=cellLeft+Math.random()*Math.max(0,cellW-padding-w);
-      const y=cellTop+Math.random()*Math.max(0,cellH-padding-h);
-      folder.style.left=`${x}px`;folder.style.top=`${y}px`;
+    columns.forEach((colIndices,col)=>{
+      const cellLeft=padding+col*cellW;
+      const usedH=colIndices.reduce((sum,idx)=>sum+sizes[idx].h,0)+(colIndices.length-1)*padding;
+      const slack=Math.max(0,(containerRect.height-padding)-usedH);
+      let y=padding+Math.random()*slack*0.6;
+      let gapBudget=slack-(y-padding);
+      colIndices.forEach((idx,i)=>{
+        if(i>0){
+          const gap=padding+Math.random()*(gapBudget/(colIndices.length-i+1));
+          gapBudget-=gap-padding;
+          y+=gap;
+        }
+        const {w,h}=sizes[idx];
+        const folder=folders[idx];
+        const x=cellLeft+Math.random()*Math.max(0,cellW-padding-w);
+        folder.style.left=`${x}px`;folder.style.top=`${y}px`;
+        y+=h;
 
-      const dragState={dragging:false};
-      const maxX=containerRect.width-w-padding,maxY=containerRect.height-h-padding;
-      makeDraggable(folder,dragState,maxX,maxY,padding);
-      if(!isTouch)makeMagnetic(folder,dragState);
-      folder.addEventListener('dblclick',()=>openTab(folder));
+        const dragState={dragging:false};
+        const maxX=containerRect.width-w-padding,maxY=containerRect.height-h-padding;
+        makeDraggable(folder,dragState,maxX,maxY,padding);
+        if(!isTouch)makeMagnetic(folder,dragState);
+        folder.addEventListener('dblclick',()=>openTab(folder));
+      });
     });
   }
 
