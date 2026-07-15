@@ -305,14 +305,17 @@
         <div class="tab-bar"><div class="tab active" data-link="home"><svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-label="home"><path d="M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3z"/></svg></div></div>
       </div>
       <div class="mac-body" id="macBody">
-        <div class="folder" data-link="image-viewer6.html"><img src="folderp.webp" alt=""><div class="label">Typography</div></div>
-        <div class="folder" data-link="image-viewer2.html"><img src="folderp.webp" alt=""><div class="label">Web</div></div>
-        <div class="folder" data-link="image-viewer.html?img=Frame 9.webp"><img src="folderp.webp" alt=""><div class="label">Graphic</div></div>
-        <div class="folder" data-link="image-viewer5.html"><img src="folderp.webp" alt=""><div class="label">BX 01</div></div>
-        <div class="folder" data-link="image-viewer3.html"><img src="folderp.webp" alt=""><div class="label">BX 02</div></div>
-        <div class="folder" data-link="image-viewer4.html"><img src="folderp.webp" alt=""><div class="label">BX 03</div></div>
-        <div class="folder" data-link="Interaction.html"><img src="folder.webp" alt=""><div class="label">Interaction</div></div>
-        <div class="folder" data-link="MotionGraphic.html"><img src="folder.webp" alt=""><div class="label">Motion Graphic</div></div>
+        <div class="folder" data-link="image-viewer6.html"><img src="folderp.webp" alt="" width="130" height="182"><div class="label">Typography</div></div>
+        <div class="folder" data-link="image-viewer2.html"><img src="folderp.webp" alt="" width="130" height="182"><div class="label">Web</div></div>
+        <div class="folder" data-link="image-viewer.html?img=Frame 9.webp"><img src="folderp.webp" alt="" width="130" height="182"><div class="label">Graphic</div></div>
+        <div class="folder" data-link="image-viewer5.html"><img src="folderp.webp" alt="" width="130" height="182"><div class="label">BX 01</div></div>
+        <div class="folder" data-link="image-viewer3.html"><img src="folderp.webp" alt="" width="130" height="182"><div class="label">BX 02</div></div>
+        <div class="folder" data-link="image-viewer4.html"><img src="folderp.webp" alt="" width="130" height="182"><div class="label">BX 03</div></div>
+        <div class="folder" data-link="Interaction.html"><img src="folder.webp" alt="" width="130" height="130"><div class="label">Interaction</div></div>
+        <div class="folder" data-link="MotionGraphic.html"><img src="folder.webp" alt="" width="130" height="130"><div class="label">Motion Graphic</div></div>
+        <div class="folder" data-link="image-viewer7.html"><img src="folderp.webp" alt="" width="130" height="182"><div class="label">Product 01</div></div>
+        <div class="folder" data-link="image-viewer8.html"><img src="folderp.webp" alt="" width="130" height="182"><div class="label">Product 02</div></div>
+        <div class="folder" data-link="image-viewer9.html"><img src="folderp.webp" alt="" width="130" height="182"><div class="label">Product 03</div></div>
       </div>
     </div>
   </div>
@@ -384,33 +387,51 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   // ---- mac-window folders: placement, drag, magnetic hover ----
   function setupFolders(){
-    const folderSize=130,labelSpace=40,padding=20;
+    const padding=20;
     const containerRect=macBody.getBoundingClientRect();
-    const maxX=containerRect.width-folderSize-padding;
-    const maxY=containerRect.height-folderSize-labelSpace-padding;
-    const placed=[];
 
-    function isOverlapping(x,y){
-      return placed.some(pos=>Math.abs(pos.x-x)<folderSize+padding&&Math.abs(pos.y-y)<folderSize+padding);
+    folders.forEach(folder=>{folder.querySelector('img').style.animationDelay=`${(Math.random()*2).toFixed(2)}s`;});
+
+    if(isMobile){
+      folders.forEach(folder=>folder.addEventListener('click',()=>openTab(folder)));
+      return;
     }
 
-    folders.forEach(folder=>{
-      folder.querySelector('img').style.animationDelay=`${(Math.random()*2).toFixed(2)}s`;
+    // Real per-folder footprint (icons aren't all the same aspect ratio -
+    // folderp.webp's source image isn't square, so at the same 130px width
+    // it renders noticeably taller than folder.webp does). The width/height
+    // attributes on each <img> reserve the right box size immediately, even
+    // before the image bytes arrive, so this measurement is accurate from
+    // the very first layout pass.
+    const sizes=[...folders].map(f=>{const r=f.getBoundingClientRect();return{w:r.width,h:r.height};});
+    const cellW=Math.max(...sizes.map(s=>s.w))+padding;
+    const cellH=Math.max(...sizes.map(s=>s.h))+padding;
 
-      if(isMobile){
-        folder.addEventListener('click',()=>openTab(folder));
-        return;
-      }
+    // A grid guarantees every folder its own non-overlapping cell. Pure
+    // random (or rejection-sampled) placement doesn't: it can fragment the
+    // desktop into gaps too small for one more icon even though the total
+    // free area left is still plenty, once enough folders are already down.
+    // Each folder then gets a random offset within its own cell so the
+    // result still reads as scattered rather than a visible grid, and which
+    // folder lands in which cell is shuffled too.
+    const maxRows=Math.max(1,Math.floor((containerRect.height-padding)/cellH));
+    const cols=Math.max(1,Math.ceil(folders.length/maxRows));
+    const cellOrder=[...Array(cols*maxRows).keys()];
+    for(let i=cellOrder.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [cellOrder[i],cellOrder[j]]=[cellOrder[j],cellOrder[i]];
+    }
 
-      let x,y,tries=0;
-      do{
-        x=Math.random()*(maxX-padding)+padding;
-        y=Math.random()*(maxY-padding)+padding;
-        tries++;
-      }while(isOverlapping(x,y)&&tries<100);
-      folder.style.left=`${x}px`;folder.style.top=`${y}px`;placed.push({x,y});
+    folders.forEach((folder,i)=>{
+      const {w,h}=sizes[i];
+      const cell=cellOrder[i];
+      const cellLeft=padding+(cell%cols)*cellW,cellTop=padding+Math.floor(cell/cols)*cellH;
+      const x=cellLeft+Math.random()*Math.max(0,cellW-padding-w);
+      const y=cellTop+Math.random()*Math.max(0,cellH-padding-h);
+      folder.style.left=`${x}px`;folder.style.top=`${y}px`;
 
       const dragState={dragging:false};
+      const maxX=containerRect.width-w-padding,maxY=containerRect.height-h-padding;
       makeDraggable(folder,dragState,maxX,maxY,padding);
       if(!isTouch)makeMagnetic(folder,dragState);
       folder.addEventListener('dblclick',()=>openTab(folder));
