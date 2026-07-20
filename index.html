@@ -322,6 +322,7 @@
         <div class="folder" data-link="image-viewer7.html"><img src="folderp.webp" alt="" width="130" height="182"><div class="label">Product 01</div></div>
         <div class="folder" data-link="image-viewer8.html"><img src="folderp.webp" alt="" width="130" height="182"><div class="label">Product 02</div></div>
         <div class="folder" data-link="image-viewer9.html"><img src="folderp.webp" alt="" width="130" height="182"><div class="label">Product 03</div></div>
+        <div class="coach-mark" id="folderCoachMark">폴더를 더블클릭하면 작업을 볼 수 있어요</div>
       </div>
     </div>
   </div>
@@ -345,6 +346,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const tabBar=document.querySelector('.tab-bar');
   const cursorDot=document.getElementById('cursorDot');
   const coachMark=document.getElementById('coachMark');
+  const folderCoachMark=document.getElementById('folderCoachMark');
   const sections=Array.from(document.querySelectorAll('.scroll-container > .section'));
 
   const tabs={};
@@ -379,7 +381,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   function easeInOutCubic(t){return t<0.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;}
 
   // mobile swaps the desktop free-form folder desktop for a wrapping grid
-  if(isMobile)macBody.classList.add('mobile-layout');
+  if(isMobile){
+    macBody.classList.add('mobile-layout');
+    folderCoachMark.textContent='폴더를 탭하면 작업을 볼 수 있어요'; // mobile opens on a single tap, not double-click
+  }
 
   setupFolders();
   setupTabs();
@@ -648,14 +653,33 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!on)hideCoachMark();
   }
 
+  // Anchors the folder coach mark just below the BX 01 folder, wherever it
+  // happened to land (placement is random, and the user may have dragged
+  // it), clamped inside the mac body so it can't get clipped by the
+  // window's overflow:hidden at the edges. Positioned at show time, not
+  // init, so it follows the folder's current spot.
+  function positionFolderCoachMark(){
+    const target=[...folders].find(f=>f.querySelector('.label').textContent==='BX 01');
+    if(!target)return;
+    const bodyW=macBody.clientWidth,bodyH=macBody.clientHeight;
+    const tipW=folderCoachMark.offsetWidth,tipH=folderCoachMark.offsetHeight;
+    const left=clamp(target.offsetLeft+8,8,Math.max(8,bodyW-tipW-8));
+    const top=clamp(target.offsetTop+target.offsetHeight+6,8,Math.max(8,bodyH-tipH-8));
+    folderCoachMark.style.left=`${left}px`;
+    folderCoachMark.style.top=`${top}px`;
+  }
+
   function showCoachMark(){
     coachMark.classList.add('show');
+    positionFolderCoachMark();
+    folderCoachMark.classList.add('show');
     clearTimeout(coachMarkTimer);
     coachMarkTimer=setTimeout(hideCoachMark,5000);
   }
 
   function hideCoachMark(){
     coachMark.classList.remove('show');
+    folderCoachMark.classList.remove('show');
     clearTimeout(coachMarkTimer);
   }
 
@@ -668,6 +692,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 
   function openTab(folder){
+    hideCoachMark(); // opening a folder is exactly what the hint teaches
     const link=folder.getAttribute('data-link'),label=folder.querySelector('.label').textContent;
     if(!tabs[link]){
       const tab=document.createElement('div');tab.className='tab';tab.dataset.link=link;
