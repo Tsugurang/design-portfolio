@@ -20,6 +20,7 @@
       --fg-dark: #101010;
       --fg-muted: #767676;
       --accent: #5a3eff;
+      --pop: #ff2d55;
       --border: #e4e4e4;
       --shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
     }
@@ -254,9 +255,9 @@
 <body>
 <div class="cursor-dot" id="cursorDot"></div>
 <div class="scroll-container" id="scrollContainer">
-  <div class="section" id="home" style="display: flex; align-items: center; justify-content: flex-start; padding-left: 8vw; background: linear-gradient(to bottom, transparent 65%, var(--bg-light) 100%), radial-gradient(circle at center, #007bff, #00c6ff, #d9faff); text-align: left; overflow: hidden;">
+  <div class="section" id="home" style="display: flex; align-items: center; justify-content: flex-start; padding-left: 8vw; background: radial-gradient(circle, rgba(15,5,40,0.4) 1.8px, transparent 2.2px) 0 0/10px 10px, radial-gradient(circle, rgba(15,5,40,0.22) 2.4px, transparent 2.9px) 5px 6px/16px 16px, linear-gradient(to bottom, transparent 65%, var(--bg-light) 100%), radial-gradient(circle at center, #007bff, #00c6ff, #d9faff); text-align: left; overflow: hidden;">
     <div class="fade-up" style="position: absolute; top: 20%; left: 8vw; transform: translateY(-50%);">
-      <h1 style="font-size: clamp(1.6rem, 5vw, 2.8rem); font-weight: 600; letter-spacing: -0.01em; margin-bottom: clamp(3rem, 18vw, 13rem); margin-top: 0px; color: #202123;">2026<br><span style="font-size: clamp(3rem, 16vw, 10rem); font-family: 'Heading Pro Trial'; letter-spacing: -0.02em; color: #030303;">PORTFOLIO</span></h1>
+      <h1 style="font-size: clamp(1.6rem, 5vw, 2.8rem); font-weight: 600; letter-spacing: -0.01em; margin-bottom: clamp(3rem, 18vw, 13rem); margin-top: 0px; color: #202123;">2026<br><span style="font-size: clamp(3rem, 16vw, 10rem); font-family: 'Heading Pro Trial'; letter-spacing: -0.02em; color: var(--pop);">PORTFOLIO</span></h1>
       <p style="font-size: clamp(1rem, 3vw, 1.8rem); max-width: 600px; line-height: 1.7; font-weight: 600; letter-spacing: 0.02em; color: #333;">JEONG CHAN HEE</p>
       <p style="font-size: clamp(0.75rem, 2vw, 0.9rem); margin-top: 1rem; font-weight: 500; letter-spacing: 0.01em; color: #555;">이 포트폴리오는 PC 환경에 최적화되어 있습니다.</p>
     </div>
@@ -1053,7 +1054,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     function draw(){
       ctx.clearRect(0,0,W,H);
       const p=verts.map(project);
-      ctx.fillStyle='#fff';
+      ctx.fillStyle='#ff2d55';
       ctx.shadowColor='rgba(10,10,30,0.35)';
       ctx.shadowBlur=6;
       edges.forEach(([a,b])=>{
